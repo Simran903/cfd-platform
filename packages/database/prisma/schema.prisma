@@ -5,10 +5,58 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  balance   Balance?
+  trades    Trade[]
+}
+
+model Balance {
+  id     String @id @default(uuid())
+  amount Float  @default(10000)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Asset {
+  id     String  @id @default(uuid())
+  symbol String  @unique
+  name   String
+  trades Trade[]
+}
+
+model Trade {
+  id         String      @id @default(uuid())
+  userId     String
+  assetId    String
+  side       TradeSide
+  leverage   Int
+  Quantity   Float
+  entryPrice Float
+  status     TradeStatus @default(OPEN)
+  createdAt  DateTime    @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  asset Asset @relation(fields: [assetId], references: [id])
+}
+
+enum TradeSide {
+  LONG
+  SHORT
+}
+
+enum TradeStatus {
+  OPEN
+  CLOSED
+  LIQUIDATED
 }
