@@ -26,6 +26,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cursor/
 .cursor-cache/
 .cursor-tmp/
+**/.cursor
 
 # caches
 .eslintcache
