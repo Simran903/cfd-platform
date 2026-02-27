@@ -6,6 +6,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "echo database ready",
+    "seed": "bun run prisma/seed.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "dotenv": "^17.3.1",
