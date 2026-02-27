@@ -41,7 +41,7 @@ model Trade {
   assetId    String
   side       TradeSide
   leverage   Int
-  Quantity   Float
+  quantity   Float
   entryPrice Float
   status     TradeStatus @default(OPEN)
   createdAt  DateTime    @default(now())
