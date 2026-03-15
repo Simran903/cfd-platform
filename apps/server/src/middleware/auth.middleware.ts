@@ -10,6 +10,7 @@ export const authMiddleware = (
   res: Response,
   next: NextFunction,
 ) => {
+  console.log("Auth middleware triggered");
   const header = req.headers.authorization;
 
   if (!header) {

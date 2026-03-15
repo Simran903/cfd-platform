@@ -1,20 +1,38 @@
 import type { Response } from "express";
-import { prisma } from "@repo/database";
 import type { AuthRequest } from "../middleware/auth.middleware";
+import Redis from "ioredis";
+import crypto from "crypto";
 
-export const openTrade = async (req: AuthRequest, res: Response) => {
-  const { userId, assetId, side, leverage, quantity, price } = req.body;
+const redis = new Redis();
 
-  const trade = await prisma.trade.create({
-    data: {
-      userId: req.userId!,
-      assetId,
-      side,
-      leverage,
-      quantity,
-      entryPrice: price,
-    },
+export const openTrade = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  // console.log("OPEN TRADE API HIT");
+  const { assetId, side, leverage, quantity, price } =
+    req.body;
+
+  const trade = {
+    id: crypto.randomUUID(),
+    userId: req.userId,
+    assetId,
+    side,
+    leverage,
+    quantity,
+    entryPrice: price,
+    createdAt: Date.now(),
+  };
+
+  // console.log("Sending trade to Redis");
+
+  await redis.rpush(
+    "TRADE_QUEUE",
+    JSON.stringify(trade)
+  );
+
+  res.status(201).json({
+    message: "Trade submitted",
+    trade,
   });
-
-  res.status(201).json(trade);
 };
