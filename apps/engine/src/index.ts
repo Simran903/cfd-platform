@@ -1,6 +1,16 @@
+import { bootstrapEngine } from "./bootstrap/bootstrap";
 import { startTradeConsumer } from "./consumers/trade.consumer";
 
-console.log("Trading Engine Started");
+const start = async () => {
 
-startTradeConsumer();
-  
+  console.log("Trading Engine Started");
+
+  await bootstrapEngine();
+
+  console.log("Engine ready. Listening for trades...");
+
+  startTradeConsumer();
+
+}
+
+start();
