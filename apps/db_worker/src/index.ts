@@ -10,8 +10,12 @@ const startWorker = async () => {
     const event = JSON.parse(message);
 
     if (event.type === "TRADE_OPENED") {
+      const { createdAt, ...trade } = event.trade;
       await prisma.trade.create({
-        data: event.trade,
+        data: {
+          ...trade,
+          createdAt: createdAt != null ? new Date(createdAt) : undefined,
+        },
       });
 
       console.log("Trade persisted:", event.trade.id);
