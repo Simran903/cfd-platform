@@ -1,6 +1,6 @@
 import { bootstrapEngine } from "./bootstrap/bootstrap";
+import { startPriceConsumer } from "./consumers/price.consumer";
 import { startTradeConsumer } from "./consumers/trade.consumer";
-import { startPriceSubscriber } from "./redis/price-subscriber";
 
 const start = async () => {
   console.log("Trading Engine Started");
@@ -9,8 +9,7 @@ const start = async () => {
 
   console.log("Engine ready. Listening for trades...");
 
-  await startPriceSubscriber();
-
+  startPriceConsumer();
   startTradeConsumer();
 };
 
