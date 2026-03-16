@@ -18,6 +18,10 @@ class TradeStore {
   getAll() {
     return [...this.trades.values()];
   }
+
+  remove(tradeId: string) {
+    this.trades.delete(tradeId);
+  }
 }
 
 export const tradeStore = new TradeStore();

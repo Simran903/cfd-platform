@@ -1,6 +1,7 @@
 import { redis } from "../redis/redis";
 import { priceStore } from "../stores/price.store";
 import { calculatePnl } from "../services/pnl.service";
+import { checkLiquidation } from "../services/liquidation.service";
 
 interface PriceMessage {
   symbol: string;
@@ -22,5 +23,6 @@ export const startPriceConsumer = async () => {
     console.log(`Price update ${data.symbol}: ${data.price}`);
 
     calculatePnl();
+    checkLiquidation();
   });
 };
