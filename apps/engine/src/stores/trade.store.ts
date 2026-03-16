@@ -15,6 +15,10 @@ class TradeStore {
     this.trades.set(trade.id, trade);
   }
 
+  get(tradeId: string) {
+    return this.trades.get(tradeId);
+  }
+
   getAll() {
     return [...this.trades.values()];
   }
