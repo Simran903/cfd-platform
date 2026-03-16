@@ -4,6 +4,6 @@ import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-router.post("/open", openTrade);
+router.post("/open", authMiddleware, openTrade);
 
 export default router;
