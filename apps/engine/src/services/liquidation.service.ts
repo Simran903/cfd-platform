@@ -1,8 +1,9 @@
 import { priceStore } from "../stores/price.store";
 import { tradeStore } from "../stores/trade.store";
 import { userStore } from "../stores/user.store";
+import { redis } from "../redis/redis";
 
-export const checkLiquidation = () => {
+export const checkLiquidation = async () => {
   const trades = tradeStore.getAll();
 
   for (const trade of trades) {
@@ -20,11 +21,25 @@ export const checkLiquidation = () => {
       pnl = (trade.entryPrice - price) * trade.quantity * trade.leverage;
     }
 
-    const equity = user.balance + pnl;
+    const margin =
+      (trade.quantity * trade.entryPrice) / trade.leverage;
 
-    if (equity <= 0) {
-      console.log(`Trade ${trade.id} liquidated`);
+    if (pnl <= -margin) {
+      console.log(`Trade ${trade.id} LIQUIDATED`);
+
       tradeStore.remove(trade.id);
+
+      await redis.publish(
+        "trade_events",
+        JSON.stringify({
+          type: "TRADE_LIQUIDATED",
+          tradeId: trade.id,
+          userId: trade.userId,
+          pnl,
+          price,
+          liquidatedAt: Date.now(),
+        })
+      );
     }
   }
 };

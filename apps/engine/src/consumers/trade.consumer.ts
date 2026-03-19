@@ -15,6 +15,6 @@ export const startTradeConsumer = async () => {
 
     // console.log("Received trade:", trade);
 
-    executeTrade(trade);
+    await executeTrade(trade);
   }
 };

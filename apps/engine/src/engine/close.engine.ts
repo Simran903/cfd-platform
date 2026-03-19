@@ -39,10 +39,11 @@ export const closeTrade = async (payload: any) => {
   await redis.publish(
     "trade_events",
     JSON.stringify({
-      type: "TRADE_CLOSED",
+      type: payload.liquidated ? "TRADE_LIQUIDATED" : "TRADE_CLOSED",
       tradeId: trade.id,
       pnl,
       closedAt: Date.now(),
     }),
   );
 };
+  

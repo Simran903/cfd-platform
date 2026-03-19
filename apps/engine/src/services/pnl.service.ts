@@ -22,13 +22,13 @@ export const calculatePnl = () => {
 
     if (!currentPrice) continue;
 
-    let pnl = 0;
-
-    if (trade.side === "LONG") {
-      pnl = (currentPrice - trade.entryPrice) * trade.quantity * trade.leverage;
-    } else {
-      pnl = (trade.entryPrice - currentPrice) * trade.quantity * trade.leverage;
-    }
+    const pnl = computeTradePnl(
+      trade.side,
+      trade.entryPrice,
+      currentPrice,
+      trade.quantity,
+      trade.leverage,
+    );
 
     console.log(`Trade ${trade.id} PnL: ${pnl}`);
   }
