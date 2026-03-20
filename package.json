@@ -21,6 +21,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@repo/database": "workspace:*"
+    "@repo/database": "workspace:*",
+    "ws": "^8.19.0"
   }
 }
