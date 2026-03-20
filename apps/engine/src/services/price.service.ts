@@ -34,6 +34,14 @@ export const startPriceSubscriber = async () => {
         trade.leverage,
       );
 
+      await redis.publish(
+        "pnl_updates",
+        JSON.stringify({
+          tradeId: trade.id,
+          pnl,
+        })
+      );
+
       console.log(`Trade ${trade.id} PnL: ${pnl}`);
     }
 
