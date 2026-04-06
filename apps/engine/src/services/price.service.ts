@@ -9,22 +9,35 @@ export const startPriceSubscriber = async () => {
 
   await subscriber.subscribe("prices");
 
-  console.log("Subscribed to price updates");
-
   subscriber.on("message", async (channel, message) => {
     if (channel !== "prices") return;
 
-    const data = JSON.parse(message);
-    const { symbol, price } = data;
+    let data: unknown;
+    try {
+      data = JSON.parse(message);
+    } catch {
+      console.error("Invalid price payload");
+      return;
+    }
+
+    if (
+      typeof data !== "object" ||
+      data === null ||
+      typeof (data as { symbol?: unknown }).symbol !== "string" ||
+      typeof (data as { price?: unknown }).price !== "number"
+    ) {
+      console.error("Price payload shape invalid");
+      return;
+    }
+
+    const { symbol, price } = data as { symbol: string; price: number };
 
     // Update price store
     priceStore.setPrice(symbol, price);
 
-    console.log(`Price update ${symbol}: ${price}`);
-
     // PnL for trades
     for (const trade of tradeStore.getAll()) {
-      if (trade.assetId !== symbol) continue;
+      if (trade.assetSymbol !== symbol) continue;
 
       const pnl = computeTradePnl(
         trade.side,
@@ -38,11 +51,10 @@ export const startPriceSubscriber = async () => {
         "pnl_updates",
         JSON.stringify({
           tradeId: trade.id,
+          userId: trade.userId,
           pnl,
         })
       );
-
-      console.log(`Trade ${trade.id} PnL: ${pnl}`);
     }
 
     // Liquidation check

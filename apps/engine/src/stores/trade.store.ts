@@ -1,7 +1,7 @@
 export type Trade = {
   id: string;
   userId: string;
-  assetId: string;
+  assetSymbol: string;
   side: "LONG" | "SHORT";
   leverage: number;
   quantity: number;

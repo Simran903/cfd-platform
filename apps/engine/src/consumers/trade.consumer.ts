@@ -1,20 +1,36 @@
 import { executeTrade } from "../engine/trade.engine";
 import { redis } from "../redis/redis";
 
+const TRADE_QUEUE = "TRADE_QUEUE";
+const TRADE_PROCESSING_QUEUE = "TRADE_QUEUE_PROCESSING";
+
+const recoverInFlightTrades = async () => {
+  while (true) {
+    const restored = await redis.rpoplpush(
+      TRADE_PROCESSING_QUEUE,
+      TRADE_QUEUE,
+    );
+    if (!restored) break;
+  }
+};
+
 export const startTradeConsumer = async () => {
-  // console.log("Listening for trades...");
+  await recoverInFlightTrades();
 
   while (true) {
-    const data = await redis.blpop("TRADE_QUEUE", 0);
+    const rawTrade = await redis.brpoplpush(
+      TRADE_QUEUE,
+      TRADE_PROCESSING_QUEUE,
+      0,
+    );
+    if (!rawTrade) continue;
 
-    // console.log("Raw redis data:", data);
-
-    if (!data) continue;
-
-    const trade = JSON.parse(data[1]);
-
-    // console.log("Received trade:", trade);
-
-    await executeTrade(trade);
+    try {
+      const trade = JSON.parse(rawTrade);
+      await executeTrade(trade);
+      await redis.lrem(TRADE_PROCESSING_QUEUE, 1, rawTrade);
+    } catch (error) {
+      console.error("Trade consumer failed to process payload:", error);
+    }
   }
 };

@@ -8,19 +8,27 @@ const fetchBTCPrice = async () => {
   const res = await fetch(
     "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
   );
+  if (!res.ok) {
+    throw new Error(`Binance returned ${res.status}`);
+  }
 
-  const data = (await res.json()) as BinanceTickerPrice;
+  const data = (await res.json()) as Partial<BinanceTickerPrice>;
+  if (typeof data.price !== "string") {
+    throw new Error("Invalid Binance price payload");
+  }
 
-  return Number(data.price);
+  const parsedPrice = Number(data.price);
+  if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+    throw new Error("Invalid parsed BTC price");
+  }
+
+  return parsedPrice;
 };
 
 export const startPricePoller = async () => {
-  console.log("Price poller Started");
-
   setInterval(async () => {
     try {
       const price = await fetchBTCPrice();
-      // console.log("BTCUSDT price:", price);
 
       await redis.publish(
         "prices",
