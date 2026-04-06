@@ -36,12 +36,7 @@ export const startWebSocketServer = async (server: any) => {
     }
   });
 
-  // subscribe to events from engine
-  subscriber.subscribe("trade_events");
-  subscriber.subscribe("prices");
-  subscriber.subscribe("pnl_updates");
-  
-
+  // Register listener before subscribe so ioredis does not drop early pub/sub messages.
   subscriber.on("message", (channel, message) => {
     let data: unknown;
     try {
@@ -74,4 +69,6 @@ export const startWebSocketServer = async (server: any) => {
       }
     });
   });
+
+  await subscriber.subscribe("trade_events", "prices", "pnl_updates");
 };

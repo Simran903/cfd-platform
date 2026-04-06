@@ -42,6 +42,9 @@ type TradeFormProps = {
   }) => void;
 };
 
+const inputClass =
+  "w-full rounded-xl border border-white/[0.08] bg-zinc-900/60 px-3 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-lime-400/25 focus:outline-none focus:ring-1 focus:ring-lime-400/20";
+
 export default function TradeForm({
   token,
   apiBaseUrl,
@@ -97,7 +100,7 @@ export default function TradeForm({
         entryPrice: openedTrade.entryPrice,
         createdAt: openedTrade.createdAt,
       });
-      setSuccess(`Trade opened: ${data.trade.id}`);
+      setSuccess(`Opened ${openedTrade.id.slice(0, 8)}…`);
     } catch {
       setError("Network error while opening trade");
     } finally {
@@ -106,92 +109,89 @@ export default function TradeForm({
   };
 
   return (
-    <div className="p-4 border rounded space-y-4">
-      <h2 className="text-lg font-semibold">Trade Panel</h2>
+    <div className="rounded-2xl border border-white/[0.06] bg-zinc-950/40 p-6 backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+          New order
+        </h2>
+      </div>
 
-      {/* LONG / SHORT buttons */}
-      <div className="flex gap-2">
+      <div className="mt-6 grid grid-cols-2 gap-1 rounded-xl bg-zinc-900/80 p-1">
         <button
           type="button"
           onClick={() => setForm({ ...form, side: "LONG" })}
-          className={`px-4 py-2 rounded ${
+          className={`rounded-lg py-2.5 text-sm font-medium transition-colors ${
             form.side === "LONG"
-              ? "bg-green-500 text-white"
-              : "bg-gray-200"
+              ? "bg-lime-400/15 text-lime-300 shadow-sm shadow-lime-400/5"
+              : "text-zinc-500 hover:text-zinc-400"
           }`}
         >
-          LONG
+          Long
         </button>
-
         <button
           type="button"
           onClick={() => setForm({ ...form, side: "SHORT" })}
-          className={`px-4 py-2 rounded ${
+          className={`rounded-lg py-2.5 text-sm font-medium transition-colors ${
             form.side === "SHORT"
-              ? "bg-red-500 text-white"
-              : "bg-gray-200"
+              ? "bg-rose-500/15 text-rose-300 shadow-sm shadow-rose-500/5"
+              : "text-zinc-500 hover:text-zinc-400"
           }`}
         >
-          SHORT
+          Short
         </button>
       </div>
 
-      {/* Quantity */}
-      <div>
-        <label className="text-sm text-gray-500">Quantity</label>
-        <input
-          type="number"
-          step="0.001"
-          min="0.001"
-          value={form.quantity}
-          onChange={(e) =>
-            setForm({ ...form, quantity: Number(e.target.value) })
-          }
-          className="border p-2 w-full"
-        />
+      <div className="mt-6 space-y-4">
+        <label className="block">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Size</span>
+          <input
+            type="number"
+            step="0.001"
+            min="0.001"
+            value={form.quantity}
+            onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
+            className={`${inputClass} mt-1.5`}
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Entry</span>
+          <input
+            type="number"
+            min="1"
+            value={currentPrice ?? form.price}
+            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+            className={`${inputClass} mt-1.5`}
+          />
+        </label>
+
+        <div>
+          <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <span>Leverage</span>
+            <span className="font-mono text-zinc-300">{form.leverage}×</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={20}
+            value={form.leverage}
+            onChange={(e) => setForm({ ...form, leverage: Number(e.target.value) })}
+            className="mt-3 h-1 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-lime-400"
+          />
+        </div>
       </div>
 
-      {/* Entry Price */}
-      <div>
-        <label className="text-sm text-gray-500">Entry Price</label>
-        <input
-          type="number"
-          min="1"
-          value={currentPrice ?? form.price}
-          onChange={(e) =>
-            setForm({ ...form, price: Number(e.target.value) })
-          }
-          className="border p-2 w-full"
-        />
-      </div>
-
-      {/* Leverage */}
-      <div>
-        <label className="text-sm text-gray-500">Leverage: {form.leverage}x</label>
-        <input
-          type="range"
-          min={1}
-          max={20}
-          value={form.leverage}
-          onChange={(e) =>
-            setForm({ ...form, leverage: Number(e.target.value) })
-          }
-          className="w-full"
-        />
-      </div>
-
-      {/* Submit */}
       <button
         type="button"
         onClick={openTrade}
         disabled={isSubmitting || !token}
-        className="bg-blue-500 text-white px-4 py-2 rounded w-full"
+        className="mt-6 w-full rounded-xl bg-zinc-100 py-3 text-sm font-medium text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {isSubmitting ? "Submitting..." : "Open Trade"}
+        {isSubmitting ? "Submitting…" : "Open position"}
       </button>
 
-      {error ? <div className="text-sm text-red-500">{error}</div> : null}
-      {success ? <div className="text-sm text-green-600">{success}</div> : null}
+      {error ? <p className="mt-3 text-center text-xs text-rose-400">{error}</p> : null}
+      {success ? <p className="mt-3 text-center text-xs text-lime-400/90">{success}</p> : null}
     </div>
   );
 }

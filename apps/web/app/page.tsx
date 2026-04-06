@@ -1,377 +1,153 @@
 "use client";
 
-import PnL from "@/components/PnL";
-import PriceTicker from "@/components/PriceTicker";
-import Positions from "@/components/Positions";
-import TradeForm from "@/components/TradeForm";
-import { getMagicClient } from "@/lib/magic";
-import { useEffect, useMemo, useState } from "react";
+import { BrandLink } from "@/components/BrandLink";
+import { BRAND } from "@/lib/config";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
-type TradeSide = "LONG" | "SHORT";
-
-type Trade = {
-  id: string;
-  userId: string;
-  assetSymbol: string;
-  side: TradeSide;
-  leverage: number;
-  quantity: number;
-  entryPrice: number;
-  createdAt: number;
-};
-
-type TradeEvent = {
-  type: string;
-  tradeId?: string;
-  pnl?: number;
-};
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3000";
-const isMisconfiguredApiBaseUrl = /magiclabs\.com/i.test(API_BASE_URL);
-
-const getUserIdFromToken = (token: string | null): string | null => {
-  if (!token) return null;
-  try {
-    const payloadRaw = token.split(".")[1];
-    if (!payloadRaw) return null;
-
-    const normalized = payloadRaw.replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = JSON.parse(atob(normalized)) as { userId?: unknown };
-    return typeof decoded.userId === "string" ? decoded.userId : null;
-  } catch {
-    return null;
-  }
-};
-
-export default function Home() {
-  const [token, setToken] = useState<string>("");
-  const [email, setEmail] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-
-  const [price, setPrice] = useState<number | null>(null);
-  const [symbol, setSymbol] = useState("BTCUSDT");
-  const [positions, setPositions] = useState<Trade[]>([]);
-  const [pnlByTradeId, setPnlByTradeId] = useState<Record<string, number>>({});
-  const [events, setEvents] = useState<TradeEvent[]>([]);
-  const [closingTradeId, setClosingTradeId] = useState<string | null>(null);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected">(
-    "disconnected",
-  );
-
-  const userId = getUserIdFromToken(token);
-  const isAuthenticated = token.length > 0;
-  const wsUrlWithToken = useMemo(() => {
-    if (!token) return WS_URL;
-    const separator = WS_URL.includes("?") ? "&" : "?";
-    return `${WS_URL}${separator}token=${encodeURIComponent(token)}`;
-  }, [token]);
+export default function HomePage() {
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
-    const savedToken = window.localStorage.getItem("cfd_token");
-    if (savedToken) {
-      setToken(savedToken);
-    }
+    setHasSession(Boolean(window.localStorage.getItem("cfd_token")));
   }, []);
 
-  useEffect(() => {
-    const ws = new WebSocket(wsUrlWithToken);
-    setWsStatus("connecting");
-
-    type WsMessage = { channel: string; data: unknown };
-    type PricePayload = { symbol?: unknown; price?: unknown };
-    type PnlUpdatePayload = { tradeId?: unknown; pnl?: unknown };
-    type TradeEventPayload = {
-      type?: unknown;
-      tradeId?: unknown;
-      pnl?: unknown;
-      trade?: unknown;
-    };
-
-    type OpenTradeEventPayload = {
-      trade?: {
-        id?: unknown;
-        userId?: unknown;
-        assetId?: unknown;
-        assetSymbol?: unknown;
-        side?: unknown;
-        leverage?: unknown;
-        quantity?: unknown;
-        entryPrice?: unknown;
-        createdAt?: unknown;
-      };
-    };
-
-    ws.onopen = () => setWsStatus("connected");
-    ws.onclose = () => setWsStatus("disconnected");
-    ws.onerror = () => setWsStatus("disconnected");
-
-    ws.onmessage = (event: MessageEvent) => {
-      let parsed: WsMessage;
-      try {
-        parsed = JSON.parse(event.data as string) as WsMessage;
-      } catch {
-        return;
-      }
-      const { channel, data } = parsed;
-
-      if (channel === "prices") {
-        const payload = data as PricePayload;
-        if (typeof payload.symbol === "string") {
-          setSymbol(payload.symbol);
-        }
-        if (typeof payload.price === "number") {
-          setPrice(payload.price);
-        }
-        return;
-      }
-
-      if (channel === "pnl_updates") {
-        const payload = data as PnlUpdatePayload;
-        if (typeof payload.tradeId !== "string") return;
-        if (typeof payload.pnl !== "number") return;
-
-        const tradeId = payload.tradeId;
-        const pnlValue = payload.pnl;
-
-        setPnlByTradeId((prev) => ({
-          ...prev,
-          [tradeId]: pnlValue,
-        }));
-        return;
-      }
-
-      if (channel === "trade_events") {
-        const payload = data as TradeEventPayload;
-        if (typeof payload.type !== "string") return;
-        const eventType = payload.type;
-        const tradeId = typeof payload.tradeId === "string" ? payload.tradeId : undefined;
-        const pnl = typeof payload.pnl === "number" ? payload.pnl : undefined;
-
-        if (eventType === "TRADE_OPENED") {
-          const tradePayload = (payload as OpenTradeEventPayload).trade;
-          const assetSymbol =
-            typeof tradePayload?.assetSymbol === "string"
-              ? tradePayload.assetSymbol
-              : typeof tradePayload?.assetId === "string"
-                ? tradePayload.assetId
-                : null;
-          const isValidTrade =
-            tradePayload &&
-            typeof tradePayload.id === "string" &&
-            typeof tradePayload.userId === "string" &&
-            typeof assetSymbol === "string" &&
-            (tradePayload.side === "LONG" || tradePayload.side === "SHORT") &&
-            typeof tradePayload.leverage === "number" &&
-            typeof tradePayload.quantity === "number" &&
-            typeof tradePayload.entryPrice === "number" &&
-            typeof tradePayload.createdAt === "number";
-
-          if (!isValidTrade) return;
-          if (userId && tradePayload.userId !== userId) return;
-
-          const trade = { ...tradePayload, assetSymbol } as Trade;
-          setPositions((prev) => (prev.some((item) => item.id === trade.id) ? prev : [trade, ...prev]));
-          setEvents((prev) => [{ type: eventType, tradeId: trade.id }, ...prev].slice(0, 30));
-          return;
-        }
-
-        if (eventType === "TRADE_CLOSED" || eventType === "TRADE_LIQUIDATED") {
-          if (!tradeId) return;
-
-          setPositions((prev) => prev.filter((position) => position.id !== tradeId));
-          setPnlByTradeId((prev) => {
-            const next = { ...prev };
-            delete next[tradeId];
-            return next;
-          });
-          setEvents((prev) => [{ type: eventType, tradeId, pnl }, ...prev].slice(0, 30));
-        }
-      }
-    };
-
-    return () => ws.close();
-  }, [wsUrlWithToken, userId]);
-
-  const handleAuth = async () => {
-    setAuthError(null);
-    setIsAuthenticating(true);
-    try {
-      if (isMisconfiguredApiBaseUrl) {
-        setAuthError(
-          "NEXT_PUBLIC_API_URL is pointing to Magic Labs. Set it to your backend URL (e.g. http://localhost:3000).",
-        );
-        return;
-      }
-
-      const magic = getMagicClient();
-      // Email OTP (“enter code from email”) — matches Magic’s OTP modal flow.
-      await magic.auth.loginWithEmailOTP({ email, showUI: true });
-      const didToken = await magic.user.getIdToken();
-
-      const response = await fetch(`${API_BASE_URL}/auth/magic/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          didToken,
-          email: email.trim().toLowerCase(),
-        }),
-      });
-      const data = (await response.json()) as { token?: string; message?: string };
-      if (!response.ok || !data.token) {
-        setAuthError(data.message ?? "Authentication failed");
-        return;
-      }
-
-      setToken(data.token);
-      window.localStorage.setItem("cfd_token", data.token);
-    } catch {
-      setAuthError("Network error while authenticating");
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      if (token) {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
-    } catch {
-      // Always clear local state even if logout request fails.
-    } finally {
-      setToken("");
-      setPositions([]);
-      setPnlByTradeId({});
-      setEvents([]);
-      window.localStorage.removeItem("cfd_token");
-      setIsLoggingOut(false);
-    }
-  };
-
-  const handleTradeOpened = (trade: Trade) => {
-    setPositions((prev) => {
-      const normalized = {
-        ...trade,
-        assetSymbol: trade.assetSymbol ?? (trade as Trade & { assetId?: string }).assetId ?? "BTCUSDT",
-      };
-      return prev.some((item) => item.id === normalized.id) ? prev : [normalized, ...prev];
-    });
-  };
-
-  const handleClosePosition = async (tradeId: string) => {
-    setClosingTradeId(tradeId);
-    try {
-      const response = await fetch(`${API_BASE_URL}/trade/close`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tradeId }),
-      });
-
-      if (!response.ok) {
-        const errorData = (await response.json()) as { message?: string };
-        throw new Error(errorData.message ?? "Failed to close trade");
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to close trade";
-      setEvents((prev) => [{ type: `ERROR: ${message}`, tradeId }, ...prev].slice(0, 30));
-    } finally {
-      setClosingTradeId(null);
-    }
-  };
-
   return (
-    <div className="mx-auto w-full max-w-6xl p-6 space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">CFD Trading Dashboard</h1>
-        {isAuthenticated ? (
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="rounded border px-3 py-1.5 text-sm disabled:opacity-60"
-          >
-            {isLoggingOut ? "Logging out..." : "Logout"}
-          </button>
-        ) : null}
-      </div>
-
-      {!isAuthenticated ? (
-        <div className="max-w-md space-y-3 rounded-lg border p-4">
-          <div className="text-lg font-semibold">Sign in with Magic Link</div>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border p-2"
-          />
-          <button
-            type="button"
-            disabled={isAuthenticating || !email}
-            onClick={handleAuth}
-            className="w-full rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-60"
-          >
-            {isAuthenticating ? "Please wait..." : "Continue with Magic"}
-          </button>
-          {authError ? <div className="text-sm text-red-500">{authError}</div> : null}
+    <div className="min-h-screen">
+      <header className="border-b border-white/[0.06]">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+          <BrandLink />
+          <nav className="flex items-center gap-6">
+            <a
+              href="#features"
+              className="hidden text-[11px] font-medium uppercase tracking-[0.15em] text-zinc-500 transition hover:text-zinc-300 sm:inline"
+            >
+              Features
+            </a>
+            {hasSession ? (
+              <Link
+                href="/dashboard"
+                className="rounded-full bg-zinc-100 px-4 py-2 text-xs font-medium text-zinc-950 transition hover:bg-white"
+              >
+                Open terminal
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-[11px] font-medium uppercase tracking-[0.15em] text-zinc-500 transition hover:text-zinc-300"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="rounded-full bg-zinc-100 px-4 py-2 text-xs font-medium text-zinc-950 transition hover:bg-white"
+                >
+                  Get started
+                </Link>
+              </>
+            )}
+          </nav>
         </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-3">
-          <PriceTicker symbol={symbol} price={price} />
-          <PnL pnlByTradeId={pnlByTradeId} />
-          <div className="rounded-lg border p-4">
-            <div className="text-sm text-gray-500">Session</div>
-            <div className="mt-1 text-sm break-all">User: {userId ?? "Unknown"}</div>
-            <div className="mt-1 text-xs text-gray-500">WebSocket: {wsStatus}</div>
+      </header>
+
+      <main>
+        <section className="mx-auto max-w-5xl px-6 pb-24 pt-20 md:pt-28">
+          <p className="text-center text-[11px] font-medium uppercase tracking-[0.3em] text-zinc-500">
+            Crypto CFDs
+          </p>
+          <h1 className="mx-auto mt-6 max-w-2xl text-center text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl md:leading-[1.1]">
+            Trade with clarity.
+            <span className="block text-zinc-500">Built for focus.</span>
+          </h1>
+          <p className="mx-auto mt-6 max-w-lg text-center text-base leading-relaxed text-zinc-500">
+            {BRAND} is a minimal trading terminal: live marks, positions, and risk — without the
+            noise.
+          </p>
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
+            {hasSession ? (
+              <Link
+                href="/dashboard"
+                className="w-full rounded-full bg-zinc-100 px-8 py-3 text-center text-sm font-medium text-zinc-950 transition hover:bg-white sm:w-auto"
+              >
+                Go to dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="w-full rounded-full bg-zinc-100 px-8 py-3 text-center text-sm font-medium text-zinc-950 transition hover:bg-white sm:w-auto"
+                >
+                  Get started
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="w-full rounded-full border border-white/[0.1] px-8 py-3 text-center text-sm font-medium text-zinc-300 transition hover:border-white/[0.15] hover:bg-white/[0.03] sm:w-auto"
+                >
+                  Sign in
+                </Link>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        </section>
 
-      {isAuthenticated ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TradeForm
-            token={token}
-            apiBaseUrl={API_BASE_URL}
-            currentPrice={price}
-            onTradeOpened={handleTradeOpened}
-          />
-          <Positions
-            positions={positions}
-            pnlByTradeId={pnlByTradeId}
-            onClosePosition={handleClosePosition}
-            isClosingTradeId={closingTradeId}
-          />
-        </div>
-      ) : null}
+        <section
+          id="features"
+          className="border-t border-white/[0.06] bg-zinc-950/30 py-20"
+        >
+          <div className="mx-auto grid max-w-5xl gap-12 px-6 md:grid-cols-3">
+            <div>
+              <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+                Live
+              </h2>
+              <p className="mt-3 text-lg font-medium text-zinc-100">Streamed prices</p>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+                Marks update in real time so your PnL reflects the book.
+              </p>
+            </div>
+            <div>
+              <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+                Control
+              </h2>
+              <p className="mt-3 text-lg font-medium text-zinc-100">Leverage &amp; sides</p>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+                Open long or short with configurable leverage from one panel.
+              </p>
+            </div>
+            <div>
+              <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
+                Session
+              </h2>
+              <p className="mt-3 text-lg font-medium text-zinc-100">Passwordless auth</p>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+                Sign in with email and a one-time code — no passwords to manage.
+              </p>
+            </div>
+          </div>
+        </section>
 
-      <div className="rounded-lg border p-4">
-        <h2 className="text-lg font-semibold">Trade Events</h2>
-        <div className="mt-3 space-y-2 text-sm">
-          {events.length === 0 ? (
-            <div className="text-gray-500">Waiting for events...</div>
-          ) : (
-            events.map((event, index) => (
-              <div key={`${event.type}-${event.tradeId ?? "none"}-${index}`} className="rounded border p-2">
-                <div className="font-medium">{event.type}</div>
-                {event.tradeId ? <div>Trade: {event.tradeId}</div> : null}
-                {typeof event.pnl === "number" ? <div>PnL: {event.pnl.toFixed(2)}</div> : null}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+        <section className="mx-auto max-w-5xl px-6 py-20 text-center">
+          <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
+            Ready when you are.
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-sm text-zinc-500">
+            Create an account in seconds and open the terminal.
+          </p>
+          <Link
+            href={hasSession ? "/dashboard" : "/auth/login"}
+            className="mt-8 inline-flex rounded-full bg-zinc-100 px-8 py-3 text-sm font-medium text-zinc-950 transition hover:bg-white"
+          >
+            {hasSession ? "Open terminal" : "Get started"}
+          </Link>
+        </section>
+
+        <footer className="border-t border-white/[0.06] py-8">
+          <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
+            <BrandLink />
+            <p className="text-xs text-zinc-600">Paper / demo environment.</p>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }
