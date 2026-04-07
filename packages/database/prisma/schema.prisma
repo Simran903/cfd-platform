@@ -21,18 +21,6 @@ model User {
   trades    Trade[]
 }
 
-model MagicLinkToken {
-  id        String   @id @default(uuid())
-  email     String
-  tokenHash String   @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([email])
-  @@index([expiresAt])
-}
-
 model Balance {
   id     String @id @default(uuid())
   amount Float  @default(10000)
@@ -41,22 +29,30 @@ model Balance {
 }
 
 model Asset {
-  id     String  @id @default(uuid())
-  symbol String  @unique
-  name   String
-  trades Trade[]
+  id       String  @id @default(uuid())
+  symbol   String  @unique
+  name     String
+  imageUrl String?
+  decimals Int     @default(4)
+  trades   Trade[]
 }
 
 model Trade {
-  id         String      @id @default(uuid())
-  userId     String
-  assetId    String
-  side       TradeSide
-  leverage   Int
-  quantity   Float
-  entryPrice Float
-  status     TradeStatus @default(OPEN)
-  createdAt  DateTime    @default(now())
+  id           String           @id @default(uuid())
+  userId       String
+  assetId      String
+  side         TradeSide
+  leverage     Int
+  quantity     Float
+  entryPrice   Float
+  stopLoss     Float?
+  takeProfit   Float?
+  exitPrice    Float?
+  realizedPnl  Float?
+  closedAt     DateTime?
+  closeReason  TradeCloseReason?
+  status       TradeStatus       @default(OPEN)
+  createdAt    DateTime          @default(now())
 
   user  User  @relation(fields: [userId], references: [id])
   asset Asset @relation(fields: [assetId], references: [id])
@@ -70,5 +66,12 @@ enum TradeSide {
 enum TradeStatus {
   OPEN
   CLOSED
+  LIQUIDATED
+}
+
+enum TradeCloseReason {
+  USER
+  STOP_LOSS
+  TAKE_PROFIT
   LIQUIDATED
 }
